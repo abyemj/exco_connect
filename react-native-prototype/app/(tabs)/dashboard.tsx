@@ -1,12 +1,12 @@
 
-// src/screens/DashboardScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { useAuth } from '../hooks/useAuth';
-import { globalStyles, colors, spacing, typography } from '../styles/globalStyles';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons'; // Example using MaterialCommunityIcons
+import { useAuth } from '@/context/AuthContext'; // Adjust path
+import { globalStyles, colors, spacing, typography } from '@/styles/globalStyles'; // Adjust path
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { Stack, useRouter, Redirect } from 'expo-router';
 
-// Dummy data fetching function - replace with actual API calls
+// Dummy data fetching function
 const fetchDashboardData = async () => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   return {
@@ -18,8 +18,9 @@ const fetchDashboardData = async () => {
   };
 };
 
-const DashboardScreen = () => {
+export default function DashboardScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +28,11 @@ const DashboardScreen = () => {
   const isAdmin = user && ['Chairman', 'Director'].includes(user.role);
 
   useEffect(() => {
+    if (!isAdmin && user) { // If user exists but is not admin
+        router.replace('/(tabs)/meetings'); // Redirect non-admins
+        return;
+    }
+
     if (isAdmin) {
       setIsLoading(true);
       setError(null);
@@ -37,19 +43,28 @@ const DashboardScreen = () => {
           setError("Could not load dashboard data.");
         })
         .finally(() => setIsLoading(false));
-    } else {
-        setIsLoading(false); // No data to fetch for non-admins in this prototype
+    } else if (!user) {
+        // If no user, protected route logic in _layout should handle redirect.
+        // This is a safeguard.
+        setIsLoading(false);
     }
-  }, [isAdmin]); // Re-fetch if admin status changes (though unlikely)
+  }, [isAdmin, user, router]);
 
   if (!user) {
-    // This should ideally not happen due to the navigator guarding the screen
+    // This state should ideally be caught by useProtectedRoute
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  if (!isAdmin) {
+    // Still loading or redirecting
     return (
       <View style={globalStyles.centered}>
-        <Text>User not found.</Text>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={typography.muted}>Redirecting...</Text>
       </View>
     );
   }
+
 
   const renderAdminDashboard = () => {
     if (isLoading) {
@@ -98,25 +113,15 @@ const DashboardScreen = () => {
     );
   }
 
-  const renderDelegateDashboard = () => {
-      return (
-          <View style={globalStyles.card}>
-              <Text style={typography.h3}>Welcome, {user.fullName}</Text>
-              <Text style={typography.body}>Your primary access is to Meetings and Documents.</Text>
-              {/* Add specific delegate info here if needed */}
-          </View>
-      );
-  }
-
   return (
     <ScrollView style={globalStyles.container}>
+      <Stack.Screen options={{ title: 'Dashboard' }} />
       <Text style={typography.h1}>Dashboard</Text>
-      {isAdmin ? renderAdminDashboard() : renderDelegateDashboard()}
+      {renderAdminDashboard()}
     </ScrollView>
   );
-};
+}
 
-// Simple Card Component for Dashboard
 const DashboardCard = ({ title, value, icon, description }: { title: string, value: number | string, icon: string, description: string }) => (
   <View style={[globalStyles.card, styles.card]}>
     <View style={styles.cardHeader}>
@@ -141,12 +146,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginHorizontal: -spacing.sm / 2, // Counteract card margin
+    marginHorizontal: -spacing.sm / 2,
   },
   card: {
-    width: '48%', // Roughly two columns layout
+    width: '48%', 
     marginBottom: spacing.md,
-    marginHorizontal: spacing.sm / 2, // Add horizontal margin
+    marginHorizontal: spacing.sm / 2,
   },
   cardHeader:{
     flexDirection: 'row',
@@ -170,5 +175,3 @@ const styles = StyleSheet.create({
       color: colors.muted,
   },
 });
-
-export default DashboardScreen;
